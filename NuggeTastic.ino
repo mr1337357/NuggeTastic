@@ -6,6 +6,8 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SH110X.h>
 
+#include "mt-lite.h"
+
 #define RXD 38
 #define TXD 40
 #define RY_RESET 3
@@ -24,6 +26,8 @@
 #define OLED_RESET -1
 Adafruit_SH1106G display = Adafruit_SH1106G(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
+mt_lite mt;
+
 void display_start()
 {
   delay(250);
@@ -35,28 +39,47 @@ void display_start()
   display.display();
 }
 
+void mtp_dump(mt_packet *mtp,int len)
+{
+  int i;
+  Serial.printf(" Dest: %08X\n",mtp->dest);
+  Serial.printf(" Src:  %08X\n",mtp->src);
+  Serial.printf(" Seq:  %08X\n",mtp->sequence);
+  Serial.printf(" Flag: %02X\n",mtp->flags);
+  Serial.printf(" Hash: %02X\n",mtp->channel);
+  Serial.printf(" payload:\n  ");
+  for(i=0;i<len-16;i++)
+  {
+    Serial.printf("%02X ",mtp->payload[i]);
+  }
+  Serial.printf("\n\n");
+}
+
 void handle_lora(int size)
 {
+  mt_packet *mtp;
   uint8_t data[size];
   int i;
-  // received a packet
-  Serial.print("Received packet '");
-
   for(i=0;i<size;i++)
   {
     data[i] = LoRa.read();
-    Serial.printf("%02hhX ",data[i]);
   }
-  // print RSSI of packet
-  Serial.print("' with RSSI ");
-  Serial.println(LoRa.packetRssi());
+  mtp = (mt_packet *)data;
+  // received a packet
+  Serial.print("Received packet\n");
+  mtp_dump(mtp,size);
+  mt.encrypt(mtp,size);
+  mtp_dump(mtp,size);
 }
 
 void setup() {
+  uint8_t aeskey[16] = {1};
   Serial.begin(9600);
   while(!Serial);
   display_start();
   //ry_init();
+
+  mt.set_aeskey(aeskey,16);
 
   SPI.begin(SCK,MISO,MOSI,-1);
   LoRa.setPins(CS_LORA,RESET,IO0);
