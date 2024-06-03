@@ -20,7 +20,7 @@ void mt_lite::set_aeskey(uint8_t *key,int len)
 
 void mt_lite::encrypt(mt_packet *packet,int len)
 {
-  uint8_t scratch[16];
+  uint8_t scratch[256];
   uint8_t nonce[16];
   uint8_t stream_block[16];
   int offset = 0;
@@ -28,17 +28,17 @@ void mt_lite::encrypt(mt_packet *packet,int len)
   
   len-=16;
 
-  memcpy(nonce,&packet->sequence,4);
-  memset(nonce+4,0,4);
-  memcpy(nonce+8,&packet->src,4);
+  memset(&nonce[0],0,16);
+  memcpy(&nonce[0],&packet->sequence,4);
+  memcpy(&nonce[8],&packet->src,4);
   while(offset < len)
   {
     int numbytes = len - offset;
-    if(numbytes > 16)
+    if(numbytes > sizeof(scratch))
     {
-      numbytes = 16;
+      numbytes = sizeof(scratch);
     }
-    memset(scratch,0,16);
+    memset(scratch,0,sizeof(scratch));
     memcpy(scratch,&packet->payload[offset],numbytes);
     mbedtls_aes_crypt_ctr(&aes, numbytes, &nc_off, nonce, stream_block, scratch, &packet->payload[offset]);
     offset+=numbytes;

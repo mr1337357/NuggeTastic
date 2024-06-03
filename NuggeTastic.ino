@@ -73,13 +73,14 @@ void handle_lora(int size)
 }
 
 void setup() {
-  uint8_t aeskey[16] = {1};
+  uint8_t aeskey[16] = {0xd4, 0xf1, 0xbb, 0x3a, 0x20, 0x29, 0x07, 0x59, 0xf0, 0xbc, 0xff, 0xab, 0xcf, 0x4e, 0x69, 0x01};
   Serial.begin(9600);
   while(!Serial);
   display_start();
   //ry_init();
-
-  mt.set_aeskey(aeskey,16);
+  //memset(aeskey,0,sizeof(aeskey));
+  //aeskey[0] = 1;
+  mt.set_aeskey(aeskey,sizeof(aeskey));
 
   SPI.begin(SCK,MISO,MOSI,-1);
   LoRa.setPins(CS_LORA,RESET,IO0);
