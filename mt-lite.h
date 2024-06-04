@@ -1,5 +1,11 @@
 #include <Arduino.h>
 
+typedef enum
+{
+  TEXT_MESSAGE = 1,
+
+} mt_packet_type;
+
 struct _mt_packet
 {
     uint32_t dest;
@@ -11,6 +17,15 @@ struct _mt_packet
     uint8_t payload[256];
 };
 typedef struct _mt_packet mt_packet;
+
+struct _text_message
+{
+  uint64_t mt_packet_type;
+  uint8_t text_message[256];
+};
+typedef struct _text_message text_message;
+
+
 
 class mt_lite
 {

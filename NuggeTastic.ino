@@ -7,6 +7,7 @@
 #include <Adafruit_SH110X.h>
 
 #include "mt-lite.h"
+#include "picopb.h"
 
 #define RXD 38
 #define TXD 40
@@ -57,8 +58,11 @@ void mtp_dump(mt_packet *mtp,int len)
 
 void handle_lora(int size)
 {
+  size_t pbsize;
+  int id;
   mt_packet *mtp;
   uint8_t data[size];
+  picopb pp(data+16,size-16);
   int i;
   for(i=0;i<size;i++)
   {
@@ -67,9 +71,19 @@ void handle_lora(int size)
   mtp = (mt_packet *)data;
   // received a packet
   Serial.print("Received packet\n");
-  mtp_dump(mtp,size);
   mt.encrypt(mtp,size);
   mtp_dump(mtp,size);
+  pp.decode_next(&id,&pbsize);
+  uint64_t packetType;
+  pp.read_varint(&packetType);
+  Serial.printf("packet type %d\n",packetType);
+  pp.decode_next(&id,&pbsize);
+  char text[pbsize+1];
+  pp.read_string((uint8_t *)text,pbsize+1);
+  text[pbsize] = 0;
+  Serial.printf("text: %s\n",text);
+  display.printf("text: %s\n",text);
+  display.display();
 }
 
 void setup() {
@@ -115,33 +129,10 @@ void loop() {
   int packetSize = LoRa.parsePacket();
   if(packetSize > 0)
   {
-    handle_lora(packetSize);
     display.clearDisplay();
+    handle_lora(packetSize);
     display.setCursor(0, 0);
     display.printf("packet size %d\n",packetSize);
     display.display();
-  }
-  if(Serial.available())
-  {
-    char byte = Serial.read();
-    if(outindex < 256)
-    {
-      outbound[outindex++] = byte;
-      last = millis();
-    }
-  }
-  else
-  {
-    if(last + 1000 <= millis() && outindex > 0)
-    {
-      outbound[outindex] = 0;
-      display.printf("sending %s\n",outbound);
-      display.display();
-      LoRa.beginPacket(false);
-      LoRa.write(outbound,outindex);
-      LoRa.endPacket(false);
-      outindex = 0;
-      LoRa.receive(0);
-    }
   }
 }
