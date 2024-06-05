@@ -5,6 +5,7 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SH110X.h>
+#include <EEPROM.h>
 
 #include "mt-lite.h"
 #include "picopb.h"
@@ -40,60 +41,14 @@ void display_start()
   display.display();
 }
 
-void mtp_dump(mt_packet *mtp,int len)
-{
-  int i;
-  Serial.printf(" Dest: %08X\n",mtp->dest);
-  Serial.printf(" Src:  %08X\n",mtp->src);
-  Serial.printf(" Seq:  %08X\n",mtp->sequence);
-  Serial.printf(" Flag: %02X\n",mtp->flags);
-  Serial.printf(" Hash: %02X\n",mtp->channel);
-  Serial.printf(" payload:\n  ");
-  for(i=0;i<len-16;i++)
-  {
-    Serial.printf("%02X ",mtp->payload[i]);
-  }
-  Serial.printf("\n\n");
-}
-
-void handle_lora(int size)
-{
-  size_t pbsize;
-  int id;
-  mt_packet *mtp;
-  uint8_t data[size];
-  picopb pp(data+16,size-16);
-  int i;
-  for(i=0;i<size;i++)
-  {
-    data[i] = LoRa.read();
-  }
-  mtp = (mt_packet *)data;
-  // received a packet
-  Serial.print("Received packet\n");
-  mt.encrypt(mtp,size);
-  mtp_dump(mtp,size);
-  pp.decode_next(&id,&pbsize);
-  uint64_t packetType;
-  pp.read_varint(&packetType);
-  Serial.printf("packet type %d\n",packetType);
-  pp.decode_next(&id,&pbsize);
-  char text[pbsize+1];
-  pp.read_string((uint8_t *)text,pbsize+1);
-  text[pbsize] = 0;
-  Serial.printf("text: %s\n",text);
-  display.printf("text: %s\n",text);
-  display.display();
-}
-
 void setup() {
   uint8_t aeskey[16] = {0xd4, 0xf1, 0xbb, 0x3a, 0x20, 0x29, 0x07, 0x59, 0xf0, 0xbc, 0xff, 0xab, 0xcf, 0x4e, 0x69, 0x01};
   Serial.begin(9600);
-  while(!Serial);
+  //while(!Serial);
   display_start();
-  //ry_init();
-  //memset(aeskey,0,sizeof(aeskey));
-  //aeskey[0] = 1;
+
+  mt.init(0x11223344);
+
   mt.set_aeskey(aeskey,sizeof(aeskey));
 
   SPI.begin(SCK,MISO,MOSI,-1);
@@ -105,7 +60,6 @@ void setup() {
 
   while(!LoRa.begin(906875000)) {
     Serial.println("Starting LoRa failed!");
-    //while (1);
   }
 
   LoRa.setSpreadingFactor(11);
@@ -114,7 +68,6 @@ void setup() {
   LoRa.setPreambleLength(16);
   LoRa.setSyncWord(0x2b);
 
-  LoRa.receive(0);
   Serial.println("LoRa started");
   display.println("LoRa started");
   display.display();
@@ -125,14 +78,5 @@ uint8_t outbound[256];
 int outindex = 0;
 
 void loop() {
-  // try to parse packet
-  int packetSize = LoRa.parsePacket();
-  if(packetSize > 0)
-  {
-    display.clearDisplay();
-    handle_lora(packetSize);
-    display.setCursor(0, 0);
-    display.printf("packet size %d\n",packetSize);
-    display.display();
-  }
+  mt.update();
 }

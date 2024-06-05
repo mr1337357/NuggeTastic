@@ -109,6 +109,7 @@ pb_type picopb::decode_next(int *id,size_t *size)
       *size = next_size;
       break;
     default:
+      next_type = pb_type::INVALID;
       next_size = 0;
       *size = next_size;
       break;

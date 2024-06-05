@@ -1,3 +1,6 @@
+#ifndef __PICOPB_H__
+#define __PICOPB_H__
+
 #include <Arduino.h>
 
 typedef enum
@@ -28,3 +31,5 @@ class picopb
     size_t next_size;
     pb_type next_type;
 };
+
+#endif //__PICOPB_H__
