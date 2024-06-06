@@ -73,10 +73,45 @@ void setup() {
   display.display();
 }
 
-int32_t last;
-uint8_t outbound[256];
-int outindex = 0;
+uint8_t rxdata[256];
+size_t rxsize = 0;
+
+uint8_t txdata[256];
+size_t txsize = 0;
 
 void loop() {
   mt.update();
+  if((rxsize = mt.packet_available())>0)
+  {
+    mt.read_packet(rxdata);
+    for(int i = 0; i < rxsize;i++)
+    {
+      Serial.printf("%02X",rxdata[i]);
+    }
+    Serial.println();
+  }
+  if(Serial.available() >= 1)
+  {
+    if(Serial.peek() == '\n')
+    {
+      Serial.printf("%s(%d)\n",__FILE__,__LINE__);
+      Serial.read();
+      mt.write_packet(txdata,txsize);
+      txsize = 0;
+    }
+  }
+  if(Serial.available()>1)
+  {
+    uint8_t rxbyte;
+    uint8_t rx[3];
+    rx[0] = Serial.read();
+    rx[1] = Serial.read();
+    rx[2] = 0;
+    rxbyte = strtol((char *)rx,0,16);
+    if(txsize<256)
+    {
+      txdata[txsize++] = rxbyte;
+      Serial.printf("%s(%d)\n",__FILE__,__LINE__);
+    }
+  }
 }

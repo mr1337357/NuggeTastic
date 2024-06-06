@@ -10,6 +10,8 @@ mbedtls_aes_context aes;
 mt_lite::mt_lite()
 {
   mbedtls_aes_init(&aes);
+  rxsize = 0;
+  txsize = 0;
 }
 
 void mt_lite::init(uint32_t id)
@@ -82,13 +84,24 @@ void mt_lite::fetch_packet(mt_packet *mtp,int size)
   }
 }
 
-void mt_lite::update()
+uint8_t channelhash(const uint8_t *key)
+{
+  int i;
+  uint8_t hash = 0;
+  for(i=0;i<16;i++)
+  {
+    hash ^=key[i];
+  }
+  return hash;
+}
+
+void mt_lite::handle_rx()
 {
   size_t pp_size;
   int pp_id;
-  int size;
-  uint64_t packet_type;
   mt_packet mt;
+  int size;
+  
   size = LoRa.parsePacket();
   if(!size)
   {
@@ -103,19 +116,55 @@ void mt_lite::update()
   {
     return;
   }
+  //TODO: support key database
   encrypt(&mt,size); //same as decrypt :)
-  for(int i = 0;i<size-16;i++)
-  {
-    Serial.printf("%02X ",mt.payload[i]);
-  }
-  Serial.println("");
   picopb pp(mt.payload,size-16);
   if(pp.decode_next(&pp_id, &pp_size) != pb_type::VARINT)
   {
     //not somethinge I can handle :(
     return;
   }
-  pp.read_varint(&packet_type);
+  memcpy((void *)&rxpacket,(void *)&mt,size);
+  rxsize = size - 16;
+}
+
+void mt_lite::handle_tx()
+{
+  int temp_txsize = txsize;
+  if(!txsize)
+  {
+    return;
+  }
+  txsize = 0;
+  temp_txsize += 16;
+  txpacket.dest = 0xFFFFFFFF;
+  txpacket.src = id;
+  txpacket.sequence = sequence++;
+  txpacket.flags = 0x63;
+  txpacket.channel = 0x08;//channelhash(defaultpsk);
+  txpacket.reserved = 0;
+  encrypt(&txpacket,temp_txsize);
+  send_packet(&txpacket,temp_txsize);
+  int i;
+  uint8_t *txp = (uint8_t *)&txpacket;
+  for(i=0;i<temp_txsize;i++)
+  {
+    Serial.printf("%02X ",txp[i]);
+  }
+  Serial.println();
+
+}
+
+void mt_lite::update()
+{
+
+  int size;
+  uint64_t packet_type;
+  handle_rx();
+  handle_tx();
+
+
+/*  pp.read_varint(&packet_type);
   switch(packet_type)
   {
     case 0x01:
@@ -131,13 +180,31 @@ void mt_lite::update()
         Serial.printf("type: %d size %d\n",pt,pp_size);
         break;
       }
-    case 0x67:
+    case 0x43:
       Serial.println("telemetry");
       break;
     default:
       Serial.printf("packet type %d\n",packet_type);
       break;
   }
+  */
+}
+
+size_t mt_lite::packet_available()
+{
+  return rxsize;
+}
+
+void mt_lite::read_packet(uint8_t *rxdata)
+{
+  memcpy((void *)rxdata,(void *)rxpacket.payload,rxsize);
+  rxsize = 0;
+}
+
+void mt_lite::write_packet(uint8_t *txdata,size_t size)
+{
+  memcpy((void *)txpacket.payload,(void *)txdata,size);
+  txsize = size;
 }
 
 void mt_lite::encrypt(mt_packet *packet,int len)
