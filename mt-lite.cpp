@@ -57,6 +57,13 @@ void mt_lite::ack_packet(mt_packet *mtp,int len)
   }
   mtp->flags &= 0xF8;
   mtp->flags |= hopsLeft;
+  if(mtp->src == 0x9F788627 && len != 16)
+  {
+    len = 16;
+    send_packet(mtp,len);
+    mtp->sequence++;
+    mtp->flags = 0x60;
+  }
   send_packet(mtp,len);
 }
 
