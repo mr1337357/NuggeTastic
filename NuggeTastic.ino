@@ -1,10 +1,9 @@
-//#include <Meshtastic.h>
-
 #include <SPI.h>
 #include <LoRa.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SH110X.h>
+#include <Adafruit_NeoPixel.h>
 #include <EEPROM.h>
 
 #include "mt-lite.h"
@@ -22,11 +21,16 @@
 #define RESET  5
 #define IO0 16
 
+#define LED_COUNT 4
+#define LED_PIN 12
+
 #define i2c_Address 0x3c
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 #define OLED_RESET -1
 Adafruit_SH1106G display = Adafruit_SH1106G(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 
 mt_lite mt;
 
@@ -48,6 +52,9 @@ void setup() {
   display_start();
 
   mt.init(0x11223344);
+
+  strip.begin();           // INITIALIZE NeoPixel strip object (REQUIRED)
+  strip.show();            // Turn OFF all pixels ASAP
 
   mt.set_aeskey(aeskey,sizeof(aeskey));
 
@@ -83,6 +90,8 @@ void loop() {
   mt.update();
   if((rxsize = mt.packet_available())>0)
   {
+    strip.setPixelColor(0,strip.Color(0,20,0));
+    strip.show();
     mt.read_packet(rxdata);
     for(int i = 0; i < rxsize;i++)
     {
@@ -94,6 +103,8 @@ void loop() {
   {
     if(Serial.peek() == '\n')
     {
+      strip.setPixelColor(0,strip.Color(0,0,20));
+      strip.show();
       Serial.printf("%s(%d)\n",__FILE__,__LINE__);
       Serial.read();
       mt.write_packet(txdata,txsize);
