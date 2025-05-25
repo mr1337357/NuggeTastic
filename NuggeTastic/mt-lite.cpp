@@ -5,6 +5,13 @@
 static const uint8_t defaultpsk[] = {0xd4, 0xf1, 0xbb, 0x3a, 0x20, 0x29, 0x07, 0x59,
                                      0xf0, 0xbc, 0xff, 0xab, 0xcf, 0x4e, 0x69, 0x01};
 
+char *cusswords[] = 
+{
+  "bee",
+  "barry",
+  ""
+};
+
 mbedtls_aes_context aes;
 
 mt_lite::mt_lite()
@@ -95,6 +102,10 @@ uint8_t channelhash(const uint8_t *key)
   return hash;
 }
 
+uint8_t ntargets = 0;
+
+uint32_t targets[16];
+
 void mt_lite::handle_rx()
 {
   size_t pp_size;
@@ -108,16 +119,47 @@ void mt_lite::handle_rx()
     return;
   }
   fetch_packet(&mt,size);
-  if(!seen_seq(mt.sequence)) //TODO: ack settings (disable, allow repeats)
+  encrypt(&mt,size); //same as decrypt :)
+  Serial.println(mt.src,HEX);
+  rxsize = 1;
+  for(int i = 0; cusswords[i][0];i++)
   {
-    ack_packet(&mt,size);
+    char *word = cusswords[i];
+    if(strnstr((char*)mt.payload,word,200))
+    {
+      if(ntargets < 16)
+      {
+        targets[ntargets++] = mt.src;
+      }
+    }
+  }
+  for(int i=0;i<ntargets;i++)
+  {
+    if(mt.src == targets[i] && size > 18)
+    {
+      mt.sequence++;
+      Serial.println("target");
+      size = 18;
+      mt.payload[1] = 0;
+      //ack_packet(&mt, size);
+      encrypt(&mt,size);
+      send_packet(&mt, size);
+      encrypt(&mt,size);
+      mt.sequence++;
+      encrypt(&mt,size);
+      send_packet(&mt, size);
+      encrypt(&mt,size);
+      rxsize=2;
+    }
+    //ack_packet(&mt,size);
   }
   if(mt.dest != 0xFFFFFFFF && mt.dest != id)
   {
     return;
   }
+  return;
   //TODO: support key database
-  encrypt(&mt,size); //same as decrypt :)
+  //encrypt(&mt,size); //same as decrypt :)
   picopb pp(mt.payload,size-16);
   if(pp.decode_next(&pp_id, &pp_size) != pb_type::VARINT)
   {

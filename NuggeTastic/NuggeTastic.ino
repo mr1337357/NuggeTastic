@@ -1,3 +1,5 @@
+#include <esp_task_wdt.h>
+
 #include <SPI.h>
 #include <LoRa.h>
 #include <Wire.h>
@@ -46,6 +48,13 @@ void display_start()
 }
 
 void setup() {
+  esp_task_wdt_config_t wdtconfig;
+  wdtconfig.timeout_ms = 200;
+  wdtconfig.idle_core_mask = -1;
+  wdtconfig.trigger_panic = 1;
+  esp_task_wdt_init(&wdtconfig);  // enable panic so ESP32 restarts
+  esp_task_wdt_add(NULL); 
+
   uint8_t aeskey[16] = {0xd4, 0xf1, 0xbb, 0x3a, 0x20, 0x29, 0x07, 0x59, 0xf0, 0xbc, 0xff, 0xab, 0xcf, 0x4e, 0x69, 0x01};
   Serial.begin(9600);
   //while(!Serial);
@@ -87,17 +96,25 @@ uint8_t txdata[256];
 size_t txsize = 0;
 
 void loop() {
+  esp_task_wdt_reset(); 
   mt.update();
   if((rxsize = mt.packet_available())>0)
   {
-    strip.setPixelColor(0,strip.Color(0,20,0));
+    if(rxsize == 1)
+    {
+      strip.setPixelColor(0,strip.Color(0,20,0));
+      display.println("good");
+      display.display();
+    }
+    if(rxsize == 2)
+    {
+      strip.setPixelColor(0,strip.Color(20,0,0));
+      display.println("bad");
+      display.display();
+    }
     strip.show();
     mt.read_packet(rxdata);
-    for(int i = 0; i < rxsize;i++)
-    {
-      Serial.printf("%02X",rxdata[i]);
-    }
-    Serial.println();
+    
   }
   if(Serial.available() >= 1)
   {
